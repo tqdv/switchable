@@ -1,0 +1,19 @@
+[package]
+name = "switchable"
+version = "0.1.0"
+authors = ["Tilwa Qendov <tilwa.qendov@gmail.com>"]
+edition = "2018"
+license = "Artistic-2.0 OR GPL-3.0-or-later"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+getopts = "0.2"
+dirs = "2.0"
+regex = "1.3.7"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_json = "1.0"
+toml = "0.5" # Works with serde
+
+[profile.release]
+lto = true

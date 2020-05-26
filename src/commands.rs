@@ -1,19 +1,21 @@
-// This module contains the functions for each individual subcommand
+/*! Functions for each individual subcommand
+
+Glossary:
+* p_name: Program name
+*/
+
 prelude!();
+use std::error::Error as _;
+use crate::exitcode::{self, ExitCode};
 use crate::{config, file, alias, app, util};
-use std::env;
-use std::process::Command;
-use std::os::unix::process::CommandExt;
 use regex::Regex;
-use getopts;
 
-// Glossary:
-// * p_name: Program name
+/// The env variable to set
+const DRI_PRIME :&str = "DRI_PRIME";
+/// Name used in init and preexec hooks
+const INIT_NAME :&str = "switchable";
 
-const DRI_PRIME :&str = "DRI_PRIME"; // The env variable to set
-const INIT_NAME :&str = "switchable"; // Name used in init and preexec hooks
-
-// Entry point, dispatches to the right subcommand
+/// Entry point, dispatches to the right subcommand
 pub fn execute (p_name :&str, args :Vec<String>) -> ExitCode {
 	let n_args = &args[1..];
 	
@@ -33,6 +35,7 @@ pub fn execute (p_name :&str, args :Vec<String>) -> ExitCode {
 	}
 }
 
+/// A `_test` subcommand to see if all is working
 fn test_func () -> i32 {
 	println!("The test function works!");
 	0
@@ -40,7 +43,12 @@ fn test_func () -> i32 {
 
 // COMMANDS
 
+/// Run the specified command with GPU
 fn run_subcommand (p_name :&str, args :&[String]) -> ExitCode {
+	use std::process::Command;
+	use std::os::unix::process::CommandExt;
+	use std::env;
+
 	fn print_help (p_name :&str) {
 		print!(
 r#"Usage:
@@ -81,7 +89,7 @@ Options:
 	
 	// Parse switches
 	let parser = create_parser();
-	let opts = fear! { parser.parse(args) => parser_f };
+	let opts = tear! { parser.parse(args) => parser_f };
 	let args = &opts.free;
 	
 	// Handle arguments
@@ -113,7 +121,7 @@ Options:
 	exitcode::OK // This will never be reached because we exec
 }
 
-// Prints out shell code to load aliases
+/// Prints out shell code to load aliases
 fn init_subcommand () -> ExitCode {
 	use config::FullConfig;
 	use std::path::PathBuf;
@@ -131,7 +139,7 @@ fn init_subcommand () -> ExitCode {
 		}
 		
 		// Load preexec
-		let path = fear! { path.to_str() => |_| path_not_utf8() };
+		let path = tear! { path.to_str() => |_| path_not_utf8() };
 		println!("source \"{}\"", path);
 		
 		// Define hooks. '{{' and '}}' are for escaping
@@ -157,7 +165,7 @@ precmd_functions+=(sw_precmd)
 	}
 	
 	// Load config or die
-	let config = fear! { 
+	let config = tear! { 
 		config::load_config() => |e| { eprintln!("{}", e); exitcode::FAIL }
 	};
 	
@@ -170,8 +178,11 @@ precmd_functions+=(sw_precmd)
 	exitcode::OK
 }
 
-// NB the output of this command is executed in the shell only when there's a command
-// Make sure eveything is quoted properly !
+/** Print shell commands based on configuration in preexec hook
+
+NB: the output of this command is executed in the shell only when there's a command
+Make sure eveything is quoted properly !
+*/
 fn preexec_subcommand (args :&[String]) -> ExitCode {
 	#![allow(clippy::print_literal)]
 	use util::shell_escape;
@@ -192,7 +203,7 @@ fn preexec_subcommand (args :&[String]) -> ExitCode {
 	}
 	
 	// No warnings as this executed at every command entered in the shell
-	let command = fear! { args.get(0) => |_| exitcode::MISSING_ARG };
+	let command = tear! { args.get(0) => |_| exitcode::MISSING_ARG };
 	
 	// Process `switchable reload-aliases`
 	let reload_re = Regex::new(r"(?x)
@@ -235,8 +246,11 @@ fi
 	exitcode::OK
 }
 
-// NB the output of this command is executed in the shell
-// NB precmd is executed even if there was nothing entered in the shell
+/** Cleanup things from preexec
+
+the output of this command is executed in the shell
+precmd is executed even if there was nothing entered in the shell
+*/
 #[allow(clippy::print_literal)]
 fn precmd_subcommand () -> ExitCode {
 	print!("{}",
@@ -254,7 +268,7 @@ fi
 }
 
 
-// Displays DRI_PRIME values for each GPU by parsing the output of `xrandr --listproviders`
+/// Displays DRI_PRIME values for each GPU by parsing the output of `xrandr --listproviders`
 fn xrandr_subcommand (p_name :&str, args :&[String]) -> ExitCode {
 	fn parser_handler (e :getopts::Fail) -> ExitCode {
 		eprint!("{}", e.to_string());
@@ -262,14 +276,14 @@ fn xrandr_subcommand (p_name :&str, args :&[String]) -> ExitCode {
 	}
 	
 	fn command_failed_handler (e: app::pax::CommandF) -> ExitCode {
-		eprintln!("Command `xrandr --listproviders` failed to execute:\n{}", e.0);
+		eprintln!("{}:\n{}", e, e.source().unwrap());
 		exitcode::BAD_IO
 	}
 	
 	// Parser options
 	let mut parser = getopts::Options::new();
 	parser.optflag("h", "help", "Display help");
-	let opts = fear! { parser.parse(args) => parser_handler };
+	let opts = tear! { parser.parse(args) => parser_handler };
 	
 	// Print help if needed
 	tear_if! { opts.opt_present("help"),
@@ -280,7 +294,7 @@ fn xrandr_subcommand (p_name :&str, args :&[String]) -> ExitCode {
 	}
 	
 	// Collect data
-	let data = fear! { app::parse_xrandr() => command_failed_handler };
+	let data = tear! { app::parse_xrandr() => command_failed_handler };
 	
 	// Output
 	println!("DRI_PRIME: description");
@@ -291,8 +305,7 @@ fn xrandr_subcommand (p_name :&str, args :&[String]) -> ExitCode {
 	exitcode::OK
 }
 
-// TODO warn when Regex is invalid
-// Display the loaded configuration.
+/// Display the loaded configuration.
 fn show_config_subcommand () -> ExitCode {
 	fn handle_config_error(e :config::Error) -> ExitCode {
 		use config::Error::*;
@@ -323,18 +336,21 @@ fn show_config_subcommand () -> ExitCode {
 	}
 	
 	fn print_matches (r#match :Option<Vec<String>>) {
-		if let Some(matches) = r#match {
-			println!("Commands matches:");
-			if matches.is_empty() {
-				println!("  (None defined)")
-			} else {
-				// Print the list of matches
-				for m in matches {
-					println!("- {}", m);
-				}
-			}
-		} else {
-			println!("No commands matches defined in the 'match' key")
+		let matches = tear! { r#match => |_| {
+			println!("No commands matches defined in the 'match' key");
+		}};
+
+		println!("Commands matches:");
+		tear_if! { matches.is_empty(),
+			println!("  (None defined)");
+		}
+
+		// Print the list of matches
+		for m in matches {
+			// Check if it compiles
+			let compiles = Regex::new(&m).is_ok();
+			let compile_ok = if compiles { "" } else { " (invalid regex)" };
+			println!("- {}{}", m, compile_ok);
 		}
 	}
 	
@@ -355,7 +371,7 @@ fn show_config_subcommand () -> ExitCode {
 	}
 	
 	// Load config
-	let Metadata(meta, config) = fear! {
+	let Metadata(meta, config) = tear! {
 		config::load_config_meta() => handle_config_error
 	};
 	println!("Configuration file: {}", meta.path.to_string_lossy());
@@ -382,12 +398,13 @@ fn show_config_subcommand () -> ExitCode {
 
 	// Handle 'match' and 'alias' keys
 	print_matches(config.match_);
+	println!();
 	print_aliases(config.alias);
 
 	exitcode::OK
 }
 
-// Reloads the aliases by using the preexec hooks if available.
+/// Reloads the aliases by using the preexec hooks if available.
 fn reload_aliases_subcommand () -> ExitCode {
 	use std::convert::identity;
 	

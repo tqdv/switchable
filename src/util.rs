@@ -1,7 +1,6 @@
-// Actual utilitary functions that go nowhere else,
-// and aren't syntax extensions (see slang.rs)
+//! Actual utility functions that go nowhere else, and aren't syntax extensions (`slang`)
 
-// Given two Vecs, returns their set difference as two Vecs 
+/// Given two Vecs, returns their set difference as two Vecs
 pub fn set_diff<T :Ord> (mut left :Vec<T>, mut right :Vec<T>) -> (Vec<T>, Vec<T>) {
     use std::cmp::Ordering::*;
     
@@ -45,7 +44,7 @@ pub fn set_diff<T :Ord> (mut left :Vec<T>, mut right :Vec<T>) -> (Vec<T>, Vec<T>
     (nleft, nright)
 }
 
-// Single quotes a string for the shell
+/// Single quotes a string for the shell
 pub fn shell_escape (s :&str) -> String {
 	format!("'{}'", s.replace("'", r"'\''"))
 }

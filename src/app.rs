@@ -1,53 +1,41 @@
-// Application related functions, not the entry point
-//
-// # Symbols
-// - write_aliases, wa::
-// - parse_xrandr, ParseXrandrError
+//! Application related functions, not the entry point
 prelude!();
+use crate::exitcode::{self, ExitCode};
 use crate::{config, alias, util};
 use std::error::Error;
 use config::FullConfig;
-use std::process::Command;
 use regex::Regex;
 
-// For preexec_subcommand
-// Metadata is whether a regex failed to compile
+/// Test if the command matches any regex. The metadata is whether a regex failed to compile
 pub fn matches_command(config :&FullConfig, s :&str) -> Metadata<bool, bool> {
-	let mut matched = false;
 	let mut failed = false;
 	
 	// Find it
-	for m in config.match_.iter() {
-		let re = match_ok! { Regex::new(m);
-			Err(_) => {
-				failed = true;
-				continue;
-			}
-		};
-		
-		if re.is_match(s) {
-			matched = true;
-			break;
-		}
-	}
+	let matched = config.match_.iter()
+		.any(|e| -> bool {
+			let re = tear! { Regex::new(e) => |_| { failed = true; false } }; // TODO improve syntax
+			re.is_match(s)
+		});
 	
 	Metadata(failed, matched)
 }
 
-// For reload_aliases_subcommand
-// This function writes to the terminal through the text function
-// Reads the configuration file, and write a new aliases file while
-// informing the user of the changes
+/** Writes aliases and reload them by printing shell commands if possible
+
+This function writes to the terminal through the text function.
+It reads the configuration file, and write a new aliases file while informing the user
+of the changes
+*/
 pub fn reload_aliases<F :Fn(String) -> String> (text :F) -> Result<String, ExitCode> {
-	let pln = |s :String| { println!("{}", text(s)) };
-	// Macro to handle literal strings as well
+	/// Our printer
 	macro_rules! pln {
 		($e:expr) => {
-			pln(String::from($e))
+			println!("{}", text($e.to_string()))
 		}
 	}
-	
-	// Closure because they all depend on pln
+
+	// All closures because they depend on the pln which depends on the text function
+
 	let handle_config_failure = |e :config::Error| -> ExitCode {
 		pln!(format!("{}", e));
 		if let Some(ee) = e.source() {
@@ -64,8 +52,7 @@ pub fn reload_aliases<F :Fn(String) -> String> (text :F) -> Result<String, ExitC
 	let read_alias_f  = |e :alias::ra::Error| {
 		pln!(format!("{}", e))
 	};
-	
-	// FIXME: there may be no config
+
 	let config = terror! { config::load_config() => handle_config_failure };
 	
 	// Tell the user which commands to unalias
@@ -90,6 +77,7 @@ pub fn reload_aliases<F :Fn(String) -> String> (text :F) -> Result<String, ExitC
 			let aliases_str = to_rm.iter()
 				.map(|v| format!("'{}'", v))
 				.reduce(|a, b| format!("{} {}", a, b)).unwrap(); // We checked is_empty
+
 			pln!(format!("The following aliases have been removed: {}", aliases_str));
 			pln!("They are still loaded so unalias them by hand");
 		}
@@ -98,38 +86,33 @@ pub fn reload_aliases<F :Fn(String) -> String> (text :F) -> Result<String, ExitC
 	Ok(aliases_file)
 }
 
+/// Whether the preexec hook has been run
 pub fn hook_ran () -> bool {
 	std::env::var("SWITCHABLE_RAN").is_ok()
 }
 
-// For parse_xrandr
+/// Module for `parse_xrandr`
 pub mod pax {
-	use std::{error, result, io, fmt};
-	use fmt::{Display, Debug};
+	prelude!();
+	use std::{result, io};
 	
-	#[derive(Debug)]
-	pub struct CommandF(pub io::Error);
-	
-	impl Display for CommandF {
-		fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-			write!(f, "Executing the xrandr command failed")
-		}
-	}
-	
-	impl error::Error for CommandF {
-		fn source (&self) -> Option<&(dyn error::Error + 'static)> {
-			Some(&self.0)
-		}
-	}
+	#[derive(ThisError, Debug)]
+	#[error("Command `xrandr --listproviders` failed to execute")]
+	pub struct CommandF(#[source] pub io::Error);
 	
 	pub type Result<T> = result::Result<T, CommandF>;
 }
 
-// Assumes, English output of `xrandr --listproviders`.
-// Returns, an (possibly empty) vec of (DRI_PRIME value, GPU description) pairs.
-// Ignores, providers without descriptions
+/** Returns a vec of (DRI_PRIME value, GPU description) pairs.
+
+Assumes, English output of `xrandr --listproviders`.
+Ignores, providers without descriptions
+*/
 pub fn parse_xrandr () -> pax::Result<Vec<(String, String)>> {
-	let data = terror! { Command::new("xrandr")
+	use std::process::Command;
+
+	let data = terror! {
+		Command::new("xrandr")
 		.arg("--listproviders")
 		.output() => pax::CommandF
 	};

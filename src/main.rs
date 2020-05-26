@@ -7,12 +7,14 @@ mod alias;
 mod file;
 mod app;
 
+prelude!();
 use std::env;
 use std::process::exit;
-use getopts;
 
+/// Program version
 static VERSION :&str = "0.1.0";
 
+/// Print command-line usage
 fn print_usage (p_name: &str) {
 	print!(
 r#"Usage:
@@ -29,7 +31,10 @@ Subcommands:
 	p_name = p_name);
 }
 
-// Assumes UTF-8 command-line arguments
+/** Everything starts here
+
+Assumes UTF-8 command-line arguments
+*/
 fn main () {
 	fn create_parser () -> getopts::Options {
 		let mut parser = getopts::Options::new();
@@ -44,14 +49,10 @@ fn main () {
 	
 	// Handle command line arguments
 	let parser = create_parser();
-	let opts = match parser.parse(&args[1..]) {
-		Ok(v) => v,
-		Err(f) => {
-			// IDEA: error message
-			eprint!("{}", f.to_string());
-			exit(exitcode::BAD_ARG);
-		}
-	};
+	let opts = tear! { parser.parse(&args[1..]) => |f :getopts::Fail| {
+		eprint!("{}", f.to_string());
+		exit(exitcode::BAD_ARG);
+	}};
 	
 	// Handle help and version flags
 	let code = {

@@ -1,8 +1,12 @@
+/*! File paths
+
+Everything in this module returns `Option<T>` because getting the home dir can fail.
+*/
+
 use std::path::PathBuf;
 use dirs::*;
 
-// Everything in this module returns Option<> because getting the home dir can fail (?)
-
+/// Configuration files locations
 #[derive(Clone, Copy)]
 #[derive(Debug)]
 pub enum Location {
@@ -10,16 +14,22 @@ pub enum Location {
 	Xdg,
 }
 
+/// The type of data file
 pub enum FileType {
 	Config,
 	Aliases,
 }
 
+/// Project name, for the folder
 const NAME :&str = "switchable";
+/// Hidden home directory folder for our files
 const DOT_DIR :&str = ".switchable";
+/// Configuration file name
 const CONFIG_NAME :&str = "config.toml";
+/// Aliases file name
 const ALIAS_NAME :&str = "aliases.bash";
 
+/// Get file path for a file in the specified location
 pub fn get_path (l :Location, name :FileType) -> Option<PathBuf> {	
 	match l {
 		Location::Dot => get_dot_path(name),
@@ -27,6 +37,7 @@ pub fn get_path (l :Location, name :FileType) -> Option<PathBuf> {
 	}
 }
 
+/// Get filepath for file in Xdg location
 pub fn get_xdg_path (name :FileType) -> Option<PathBuf> {
 	match name {
 		FileType::Config =>
@@ -36,6 +47,7 @@ pub fn get_xdg_path (name :FileType) -> Option<PathBuf> {
 	}
 }
 
+/// Get filepath for file in Dot location
 pub fn get_dot_path (name :FileType) -> Option<PathBuf> {
 	match name {
 		FileType::Config =>
@@ -45,9 +57,12 @@ pub fn get_dot_path (name :FileType) -> Option<PathBuf> {
 	}
 }
 
-// Returns where the configuration file is
-// If it exists in both Dot and Xdg, it will prefer Xdg
-// Returns None if the home directory could not be found
+/** Returns the preferred location four our configuration file based on existing ones
+
+It chooses where the configuration file is. If it exists in both Dot and Xdg, it will prefer Xdg.
+
+Returns None if the home directory could not be found.
+*/
 pub fn preferred_location () -> Option<Location> {
 	fn exists (l :Location) -> Option<bool> {
 		get_path(l, FileType::Config).map(|v| v.exists())
@@ -70,20 +85,28 @@ pub fn preferred_location () -> Option<Location> {
 	}
 }
 
-// Can fail because it couldn't determine home dir
+/** Find file path specified
+
+Can fail because it couldn't determine home dir
+*/
 fn find_file (t :FileType) -> Option<PathBuf> {
 	preferred_location().and_then(|v| get_path(v, t))
 }
 
+/// Get configuration file path
 pub fn find_config_file () -> Option<PathBuf> {
 	find_file(FileType::Config)
 }
 
+/// Get aliases file path
 pub fn find_aliases_file () -> Option<PathBuf> {
 	find_file(FileType::Aliases)
 }
 
-// Returns a single Option because both depend on the home dir existing
+/** Get configuration file path with metadata about the location
+
+Returns a single Option because both depend on the home dir existing
+*/
 pub fn find_config_file_meta () -> Option<(PathBuf, Location)> {
 	match (find_config_file(), preferred_location()) {
 		(Some(p), Some(l)) => Some((p, l)),

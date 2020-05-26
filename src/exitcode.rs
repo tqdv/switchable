@@ -1,12 +1,12 @@
-// Exitcodes for use with std::process::exit
-//
-// # Synopsis
-// ```rust
-// mod exitcode;
-// use std::process::exit;
-// 
-// exit( exitcode::OK );
-// ```
+/*! Exitcodes for use with std::process::exit
+
+```rust
+mod exitcode;
+use std::process::exit;
+
+exit( exitcode::OK );
+```
+*/
 
 pub type ExitCode = i32;
 

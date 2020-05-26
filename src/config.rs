@@ -1,38 +1,36 @@
-// Loading the configuration file
-//
-// # Synopsis
-// ```rust
-// use crate::config;
-// let config = match config::load_config() {
-// 	Ok(v) => v,
-// 	Err(e) => handle_config_error(e),
-// }
-// ```
-//
-// # Symbols
-// - RawConfig, FullConfig
-// - load_config, load_config_meta
-//
-// # Implementation details
-// We use match_ instead of match, because match is a keyword,
-// and would need to be quoted as r#match, which is annoying
+/*! Loading the configuration file
+
+# Synopsis
+```rust
+use crate::config;
+let config = match config::load_config() {
+	Ok(v) => v,
+	Err(e) => handle_config_error(e),
+}
+```
+
+# Implementation details
+We use match_ instead of match, because match is a keyword,
+and would need to be quoted as r#match, which is annoying
+*/
 
 prelude!();
 use crate::file;
-use std::{error, io};
-use std::fmt::{self, Debug, Display};
+use std::io;
 use std::{path::PathBuf, fs::File, io::Read};
 use serde::Deserialize;
 use self::Error::*;
 
-// Configuration  metadata
+/// Configuration metadata
 pub struct Meta {
 	pub path :PathBuf,
 	pub location :file::Location,
 }
 
-// The Config before the defaults are applied, mirroring the configuration file
+/// Shortcut for `Option<T>`
 type O<T> = Option<T>;
+
+/// The Config before the defaults are applied, mirroring the configuration file
 #[derive(Deserialize, Debug)]
 pub struct RawConfig {
 	pub driver :O<String>,
@@ -42,8 +40,7 @@ pub struct RawConfig {
 	pub preexec :O<String>,
 }
 
-// The consumable configuration where we limit the amount of optional values.
-// IDEA: Implement Default trait, but we wouldn't really use it except in init
+/// The consumable configuration where we limit the amount of optional values.
 #[derive(Debug)]
 pub struct FullConfig {
 	pub driver :String,
@@ -53,7 +50,7 @@ pub struct FullConfig {
 }
 
 impl RawConfig {
-	// Creates a valid Config object from a RawConfig object by setting defaults
+	/// Creates a valid Config object from a RawConfig object by setting defaults
 	pub fn set_defaults (self) -> FullConfig {
 		use dirs::home_dir;
 		
@@ -70,42 +67,20 @@ impl RawConfig {
 	}
 }
 
-// config::Error
-#[derive(Debug)]
+/// config::Error
+#[derive(ThisError, Debug)]
 pub enum Error {
+	#[error("Failed to find configuration file because the home directory could not be determined")]
 	FindFileF, // from file::* functions
+	#[error("Configuration file {0:?} doesn't exist")]
 	NoFileF(PathBuf), // We don't keep the io::Error because it is unhelpful
-	ReadFileF(PathBuf, io::Error),
-	ParseF(PathBuf, toml::de::Error),
+	#[error("Failed to read from configuration file {0:?}")]
+	ReadFileF(PathBuf, #[source] io::Error),
+	#[error("Failed to parse configuration file {0:?}")]
+	ParseF(PathBuf, #[source] toml::de::Error),
 }
 
-impl Display for Error {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			FindFileF => write!(f, "Failed to find configuration file because the home directory could not be determined"),
-			NoFileF(p) =>
-				write!(f, "Configuration file '{}' doesn't exist",
-					p.to_string_lossy()),
-			ReadFileF(p, _) =>
-				write!(f, "Failed to read from configuration file '{}'",
-					p.to_string_lossy()),
-			ParseF(p, _) => 
-				write!(f, "Failed to parse configuration file '{}'",
-					p.to_string_lossy()),
-		}
-	}
-}
-
-impl error::Error for Error {
-	fn source (&self) -> Option<&(dyn error::Error + 'static)> {
-		match self {
-			ReadFileF(_, e) => Some(e),
-			ParseF(_, e) => Some(e),
-			_ => None,
-		}
-	}
-}
-
+/// Constructor for Io errors that knows if the file doesn't exist
 #[allow(non_snake_case)]
 fn IoF (p :PathBuf, e :io::Error) -> self::Error {
 	use io::ErrorKind::*;
@@ -117,7 +92,7 @@ fn IoF (p :PathBuf, e :io::Error) -> self::Error {
 
 pub type Result<T> = std::result::Result<T, self::Error>;
 
-// Used by load_config_file and load_config_meta, but mostly for meta to work
+/// Used by load_config_file and load_config_meta, but mostly for meta to work
 fn load_config_file (path :PathBuf) -> Result<RawConfig> {
 	// Open file and read contents to string
 	let mut str = String::new();
@@ -129,14 +104,16 @@ fn load_config_file (path :PathBuf) -> Result<RawConfig> {
 	Ok(config)
 }
 
-// Returns the RawConfig loaded from disk
+/// Returns the RawConfig loaded from disk
 pub fn load_config () -> Result<FullConfig> {
 	let path = terror! { file::find_config_file() => |_| FindFileF };
 	load_config_file(path).map(|v| v.set_defaults())
 }
 
-// Loads the config while preserving the metadata of it
-// This is useful for checking where the config comes from (eg. in show_config_subcommand)
+/** Loads the config while preserving the metadata of it
+
+This is useful for checking where the config comes from (eg. in `show_config_subcommand`)
+*/
 pub fn load_config_meta () -> Result<Metadata<Meta, RawConfig>> {
 	let (path, loc) = terror! { file::find_config_file_meta() => |_| FindFileF };	
 	let config = load_config_file(path.clone());

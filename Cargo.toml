@@ -3,8 +3,9 @@ name = "switchable"
 version = "0.1.0"
 authors = ["Tilwa Qendov <tilwa.qendov@gmail.com>"]
 edition = "2018"
-license = "Artistic-2.0 OR GPL-3.0-or-later"
+license = "Artistic-2.0"
 
+description = "Enable swithable graphics for certain commands"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

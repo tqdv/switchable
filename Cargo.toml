@@ -6,6 +6,10 @@ edition = "2018"
 license = "Artistic-2.0"
 
 description = "Enable swithable graphics for certain commands"
+readme = "README.md"
+repository = "https://github.com/tqdv/switchable"
+keywords = ["switchable", "graphics"]
+categories = ["command-line-utilities"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
